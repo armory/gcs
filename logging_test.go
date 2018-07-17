@@ -1,1 +1,1 @@
-package gcs
+package storage

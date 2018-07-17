@@ -1,4 +1,4 @@
-package gcs
+package storage
 
 import (
 	"context"
@@ -17,7 +17,7 @@ const (
 )
 
 //this exists so we can stub out the dependency on creating gcs objects
-type gcsWriteCreator struct {
+type writeCreator struct {
 	bkt *storage.BucketHandle
 }
 
@@ -25,7 +25,7 @@ type writerCreator interface {
 	createWriter(ctx context.Context, name string) io.WriteCloser
 }
 
-func (g *gcsWriteCreator) createWriter(ctx context.Context, name string) io.WriteCloser {
+func (g *writeCreator) createWriter(ctx context.Context, name string) io.WriteCloser {
 	wc := g.bkt.Object(name).NewWriter(ctx)
 
 	wc.CacheControl = "private"
@@ -49,8 +49,8 @@ type TimeRotator struct {
 	fileFmt        string
 }
 
-//NewTimeRotator returns a newly intitiated Writer
-func NewTimeRotator(ctx context.Context, bkt string, path string, fileFmt string, uuid string, maxAge time.Duration) *TimeRotator {
+//NewGCSTimeRotator returns a newly intitiated Writer
+func NewGCSTimeRotator(ctx context.Context, bkt string, path string, fileFmt string, uuid string, maxAge time.Duration) *TimeRotator {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
 		log.Fatal(err)
@@ -61,7 +61,7 @@ func NewTimeRotator(ctx context.Context, bkt string, path string, fileFmt string
 		ctx:           ctx,
 		path:          path,
 		fileFmt:       fileFmt,
-		writerCreator: &gcsWriteCreator{bkt: client.Bucket(bkt)},
+		writerCreator: &writeCreator{bkt: client.Bucket(bkt)},
 	}
 	bw.initLog()
 	go bw.channelReader()
@@ -69,7 +69,7 @@ func NewTimeRotator(ctx context.Context, bkt string, path string, fileFmt string
 }
 func (bw *TimeRotator) initLog() {
 	bw.logCreatedTime = time.Now()
-	ts := bw.logCreatedTime.Round(15 * time.Minute).Format(bw.fileFmt)
+	ts := bw.logCreatedTime.Round(bw.maxAge).Format(bw.fileFmt)
 	name := fmt.Sprintf(`%s/%s_%s.txt`, bw.path, ts, bw.uuid)
 	log.Infof("creating new file with name: %s", name)
 	bw.wc = bw.writerCreator.createWriter(bw.ctx, name)
