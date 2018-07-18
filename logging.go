@@ -107,7 +107,7 @@ func (bw *TimeRotator) Close() error {
 func (bw *TimeRotator) appendEvent(b []byte) (int, error) {
 	now := time.Now()
 
-	if bw.logCreatedTime.Add(bw.maxAge).Before(now) {
+	if now.After(bw.logCreatedTime.Add(bw.maxAge)) {
 		err := bw.wc.Close()
 		if err != nil {
 			log.Fatalf("error when closing GCS object: %v", err)
